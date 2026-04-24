@@ -175,7 +175,7 @@ const UsersManagement: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <img
-                        src={u.avatar_url ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.full_name ?? u.id}`}
+                        src={u.avatar_url || `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${u.full_name || u.id}`}
                         alt={u.full_name ?? ''}
                         className="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-700 object-cover shrink-0"
                       />
@@ -248,7 +248,7 @@ const UsersManagement: React.FC = () => {
               <div className="px-6 flex justify-center -mt-10 mb-4 relative z-10">
                 <div className="h-24 w-24 rounded-full border-4 border-white dark:border-slate-900 bg-slate-100 shadow-xl overflow-hidden">
                   <img
-                    src={selected.avatar_url ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${selected.full_name ?? selected.id}`}
+                    src={selected.avatar_url || `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${selected.full_name || selected.id}`}
                     alt={selected.full_name ?? ''}
                     className="h-full w-full object-cover"
                   />
