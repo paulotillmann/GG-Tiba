@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft, Save, Loader2, AlertCircle,
-  Calendar, Clock, MapPin, Users, FileText, Bell, Tag,
+  Calendar, Clock, MapPin, Users, FileText, Bell, Tag, Phone,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,6 +21,7 @@ export interface AgendaItem {
   user_id: string | null;
   created_at: string;
   updated_at: string;
+  celular_agendado?: string | null;
   // join
   pessoa?: { full_name: string } | null;
 }
@@ -74,6 +75,7 @@ const AgendaForm: React.FC<AgendaFormProps> = ({ initialData, mode, onClose, onS
   const [horarioInicio, setHorarioInicio] = useState(initialData?.horario_inicio ?? '');
   const [horarioFim, setHorarioFim]     = useState(initialData?.horario_fim ?? '');
   const [local, setLocal]               = useState(initialData?.local ?? '');
+  const [celularAgendado, setCelularAgendado] = useState(initialData?.celular_agendado ?? '');
   const [pessoaId, setPessoaId]         = useState(initialData?.pessoa_id ?? '');
   const [descricao, setDescricao]       = useState(initialData?.descricao ?? '');
   const [lembrar, setLembrar]           = useState(initialData?.lembrar ?? false);
@@ -137,10 +139,10 @@ const AgendaForm: React.FC<AgendaFormProps> = ({ initialData, mode, onClose, onS
         </button>
         <div>
           <h1 className="text-2xl font-heading font-bold text-slate-900 dark:text-white">
-            {mode === 'create' ? 'Novo Cadastro' : 'Editar Cadastro'}
+            {mode === 'create' ? 'Novo Compromisso' : 'Editar Compromisso'}
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Preencha as informações do novo contato
+            Preencha as informações do compromisso
           </p>
         </div>
       </div>
@@ -207,6 +209,23 @@ const AgendaForm: React.FC<AgendaFormProps> = ({ initialData, mode, onClose, onS
                   onChange={e => setLocal(e.target.value)}
                   placeholder="Ex: Câmara Municipal, Sala 3"
                   className="w-full pl-9 pr-4 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Celular que Agendou
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={celularAgendado}
+                  readOnly
+                  disabled
+                  placeholder="Não informado"
+                  className="w-full pl-9 pr-4 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 focus:outline-none cursor-not-allowed text-sm"
                 />
               </div>
             </div>

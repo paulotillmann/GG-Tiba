@@ -5,8 +5,9 @@ import { supabase } from '../lib/supabase';
 import { TEMPLATE_CONFIG } from '../config/template.config';
 import { 
   LayoutDashboard, Users, CalendarDays, Laptop, FileText, StickyNote,
-  Search, Bell, Plus, Moon, Sun, LogOut, Settings,
-  Shield, Puzzle, UsersRound, ChevronDown, ChevronRight, ScrollText,
+  Bell, Moon, Sun, LogOut, Settings,
+  Shield, Puzzle, UsersRound, ChevronDown, ChevronRight, ScrollText, Clock,
+  CheckSquare
 } from 'lucide-react';
 import ProfileScreen    from '../pages/ProfileScreen';
 import AccessProfiles   from '../pages/admin/AccessProfiles';
@@ -16,8 +17,9 @@ import PeopleScreen     from '../pages/PeopleScreen';
 import ActivityLogsScreen from '../pages/admin/ActivityLogsScreen';
 import AgendaScreen     from '../pages/AgendaScreen';
 import RequerimentosScreen from '../pages/RequerimentosScreen';
-import AnotacoesScreen     from '../pages/AnotacoesScreen';
-import AtendimentoScreen   from '../pages/AtendimentoScreen';
+import DemandasScreen     from '../pages/DemandasScreen';
+import AtendimentoScreen from '../pages/AtendimentoScreen';
+import AnotacoesScreen    from '../pages/AnotacoesScreen';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DashboardLayoutProps {
@@ -26,13 +28,15 @@ interface DashboardLayoutProps {
 }
 
 // ─── Sidebar Items ────────────────────────────────────────────────────────────
-const SIDEBAR_ITEMS = [
-  { id: 'dashboard',        label: 'Visão Geral',         icon: LayoutDashboard },
-  { id: 'pessoas',          label: 'Pessoas e Entidades',  icon: Users },
-  { id: 'agenda',           label: 'Agenda',               icon: CalendarDays },
-  { id: 'auto-atendimento', label: 'Auto Atendimento',     icon: Laptop },
-  { id: 'requerimentos',    label: 'Requerimentos',        icon: FileText },
-  { id: 'anotacoes',        label: 'Anotações',            icon: StickyNote },
+// Mapeamento de slug do banco → config do item de menu
+const ALL_SIDEBAR_ITEMS = [
+  { id: 'dashboard',        slug: 'dashboard',    label: 'Visão Geral',         icon: LayoutDashboard },
+  { id: 'pessoas',          slug: 'pessoas',      label: 'Pessoas e Entidades',  icon: Users },
+  { id: 'agenda',           slug: 'agenda',       label: 'Agenda',               icon: CalendarDays },
+  { id: 'auto-atendimento', slug: 'atendimentos', label: 'Auto Atendimento',     icon: Laptop },
+  { id: 'requerimentos',    slug: 'requerimentos',label: 'Requerimentos',        icon: FileText },
+  { id: 'demandas',         slug: 'demandas',     label: 'Demandas',             icon: CheckSquare },
+  { id: 'anotacoes',        slug: 'anotacoes',    label: 'Anotações',            icon: StickyNote },
 ];
 
 const CONFIG_ITEMS = [
@@ -42,19 +46,46 @@ const CONFIG_ITEMS = [
   { id: 'config/logs',      label: 'Logs de Atividade',    icon: ScrollText },
 ];
 
+// ─── Error Boundary ─────────────────────────────────────────────────────────────
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
+  constructor(props: any) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
+  render() { 
+    if (this.state.hasError) return <div className="p-8 text-red-500 font-mono">Erro de Renderização: {String(this.state.error?.message ?? this.state.error)}</div>; 
+    return this.props.children; 
+  }
+}
+
 // ─── Content Router ───────────────────────────────────────────────────────────
 const renderContent = (activeMenu: string, children: React.ReactNode) => {
-  if (activeMenu === 'perfil')           return <ProfileScreen />;
-  if (activeMenu === 'pessoas')          return <PeopleScreen />;
-  if (activeMenu === 'agenda')           return <AgendaScreen />;
-  if (activeMenu === 'requerimentos')    return <RequerimentosScreen />;
-  if (activeMenu === 'anotacoes')        return <AnotacoesScreen />;
-  if (activeMenu === 'auto-atendimento') return <AtendimentoScreen />;
-  if (activeMenu === 'config/perfis')    return <AccessProfiles />;
-  if (activeMenu === 'config/modulos')   return <ModulesScreen />;
-  if (activeMenu === 'config/usuarios')  return <UsersManagement />;
-  if (activeMenu === 'config/logs')      return <ActivityLogsScreen />;
-  return children;
+  return (
+    <ErrorBoundary>
+      {(() => {
+        if (activeMenu === 'perfil')           return <ProfileScreen />;
+        if (activeMenu === 'pessoas')          return <PeopleScreen />;
+        if (activeMenu === 'agenda')           return <AgendaScreen />;
+        if (activeMenu === 'anotacoes')        return <AnotacoesScreen />;
+        if (activeMenu === 'auto-atendimento') return <AtendimentoScreen />;
+        if (activeMenu === 'requerimentos')    return <RequerimentosScreen />;
+        if (activeMenu === 'demandas')         return <DemandasScreen />;
+        if (activeMenu === 'config/perfis')    return <AccessProfiles />;
+        if (activeMenu === 'config/modulos')   return <ModulesScreen />;
+        if (activeMenu === 'config/usuarios')  return <UsersManagement />;
+        if (activeMenu === 'config/logs')      return <ActivityLogsScreen />;
+        if (activeMenu === 'no-access') {
+          return (
+            <div className="flex flex-col items-center justify-center h-full text-slate-500">
+              <Shield className="w-16 h-16 mb-4 opacity-20" />
+              <h2 className="text-xl font-semibold mb-2">Acesso Restrito</h2>
+              <p>Seu perfil não possui acesso a nenhum módulo do sistema.</p>
+            </div>
+          );
+        }
+        if (activeMenu === 'dashboard')        return children;
+        return children;
+      })()}
+    </ErrorBoundary>
+  );
 };
 
 // ─── Sidebar Item ─────────────────────────────────────────────────────────────
@@ -84,10 +115,17 @@ const SidebarBtn: React.FC<{
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, onLogout }) => {
-  const { profile, signOut, isAdmin, updateTheme } = useAuth();
+  const { profile, signOut, isAdmin, updateTheme, userModules } = useAuth();
   const handleLogout = onLogout ?? signOut;
 
-  const [activeMenu, setActiveMenu]       = useState('dashboard');
+  const [activeMenu, setActiveMenu] = useState(() => {
+    if (isAdmin) return 'dashboard'; // Admin sempre pode ver o dashboard (ou ao menos tem configs)
+    if (userModules.length === 0) return 'no-access';
+    const hasDashboard = userModules.some(m => m.slug === 'dashboard');
+    if (hasDashboard) return 'dashboard';
+    const firstItem = ALL_SIDEBAR_ITEMS.find(item => userModules.some(m => m.slug === item.slug));
+    return firstItem ? firstItem.id : 'no-access';
+  });
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('theme') === 'dark';
   });
@@ -95,6 +133,18 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, onLogout })
   const [agendaBadge, setAgendaBadge]     = useState(0);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin && userModules.length === 0 && !activeMenu.startsWith('config/') && activeMenu !== 'perfil') {
+       setActiveMenu('no-access');
+    }
+  }, [userModules, isAdmin]);
 
   const isConfigActive = activeMenu.startsWith('config/');
 
@@ -154,32 +204,35 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, onLogout })
       <aside className={`w-64 ${TEMPLATE_CONFIG.colors.sidebarBg} ${TEMPLATE_CONFIG.colors.sidebarBgDark} border-r ${TEMPLATE_CONFIG.colors.sidebarBorder} ${TEMPLATE_CONFIG.colors.sidebarBorderDark} flex flex-col transition-colors duration-300`}>
 
         {/* Logo */}
-        <div className={`p-4 flex items-center justify-center border-b ${TEMPLATE_CONFIG.colors.sidebarBorder} ${TEMPLATE_CONFIG.colors.sidebarBorderDark} shrink-0`}>
+        <div className="p-4 flex items-center justify-center border-b border-white/10 dark:border-slate-800 shrink-0">
           <img
-            src={isDarkMode ? TEMPLATE_CONFIG.logos.sidebarDark : TEMPLATE_CONFIG.logos.sidebarLight}
+            src={TEMPLATE_CONFIG.logos.sidebarLight}
             alt={`Logo ${TEMPLATE_CONFIG.vereadorName}`}
             className="h-[80px] max-w-full w-auto object-contain drop-shadow-sm"
             onError={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/150x40?text=${encodeURIComponent(TEMPLATE_CONFIG.logos.fallbackText)}`; }}
           />
         </div>
 
-        {/* Main Menu */}
+        {/* Main Menu — filtrado pelos módulos autorizados do usuário */}
         <div className="flex-1 overflow-y-auto pt-7 pb-2 px-4 space-y-1">
-          {SIDEBAR_ITEMS.map((item) => (
-            <SidebarBtn
-              key={item.id}
-              id={item.id}
-              label={item.label}
-              icon={item.icon}
-              active={activeMenu === item.id}
-              onClick={() => setActiveMenu(item.id)}
-              badge={item.id === 'agenda' ? agendaBadge : undefined}
-            />
-          ))}
+          {ALL_SIDEBAR_ITEMS
+            .filter(item => userModules.some(m => m.slug === item.slug))
+            .map((item) => (
+              <SidebarBtn
+                key={item.id}
+                id={item.id}
+                label={item.label}
+                icon={item.icon}
+                active={activeMenu === item.id}
+                onClick={() => setActiveMenu(item.id)}
+                badge={item.id === 'agenda' ? agendaBadge : undefined}
+              />
+            ))
+          }
         </div>
 
         {/* Bottom: Configurações + Sair */}
-        <div className={`p-4 border-t ${TEMPLATE_CONFIG.colors.sidebarBorder} ${TEMPLATE_CONFIG.colors.sidebarBorderDark} space-y-1`}>
+        <div className="p-4 border-t border-white/10 dark:border-slate-800 space-y-1">
 
           {/* Configurações — admin only */}
           {isAdmin && (
@@ -242,11 +295,19 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, onLogout })
         {/* Header */}
         <header className="h-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 shrink-0 transition-colors duration-300">
 
-          {/* Espaçador para empurrar as ações para a direita */}
+          {/* Spacer para alinhar os itens à direita */}
           <div className="flex-1" />
 
           {/* Actions */}
-          <div className="flex items-center space-x-4 ml-6">
+          <div className="flex items-center space-x-4">
+
+            {/* Relógio Digital */}
+            <div className="hidden sm:flex items-center space-x-2 mr-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-lg">
+              <Clock className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+              <span className="text-sm font-bold font-heading text-slate-700 dark:text-slate-200 tracking-wider tabular-nums">
+                {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            </div>
 
             <button onClick={toggleDarkMode} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
               {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -375,7 +436,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, onLogout })
 
         {/* Scrollable Content */}
         <div id="main-scroll-container" className="flex-1 overflow-y-auto">
-          <div className="p-8 max-w-[1600px] mx-auto">
+          <div className={
+            activeMenu === 'anotacoes'
+              ? 'h-full w-full'
+              : 'p-8 max-w-[1600px] mx-auto'
+          }>
             {renderContent(activeMenu, children)}
           </div>
         </div>

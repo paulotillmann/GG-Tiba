@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, CalendarDays, StickyNote, TrendingUp, Calendar, ChevronRight, Loader2, PlusCircle, FileText, ChevronLeft, Clock, MapPin, Bell } from 'lucide-react';
+import { Users, CalendarDays, StickyNote, TrendingUp, Calendar, ChevronRight, Loader2, PlusCircle, FileText, ChevronLeft, Clock, MapPin, Bell, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { AgendaItem } from '../components/forms/AgendaForm';
-import { TEMPLATE_CONFIG } from '../config/template.config';
 
 interface DashboardStats {
   total: number;
   thisMonth: number;
-  thisWeek: number;
+  messagesToday: number;
   reqCount: number;
 }
 
@@ -48,11 +47,16 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 type ChartView = 'month' | 'week';
 
 const Dashboard: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, userModules, isAdmin } = useAuth();
   const firstName = profile?.full_name?.split(' ')[0] || 'Assessor';
 
+  const hasModule = (slug: string) => isAdmin || userModules.some(m => m.slug === slug);
+  const canPessoas = hasModule('pessoas');
+  const canReq = hasModule('requerimentos');
+  const canAgenda = hasModule('agenda');
+
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<DashboardStats>({ total: 0, thisMonth: 0, thisWeek: 0, reqCount: 0 });
+  const [stats, setStats] = useState<DashboardStats>({ total: 0, thisMonth: 0, messagesToday: 0, reqCount: 0 });
   const [chartData, setChartData] = useState<MonthlyData[]>([]);
   const [weeklyData, setWeeklyData] = useState<MonthlyData[]>([]);
   const [chartView, setChartView] = useState<ChartView>('week');
@@ -74,6 +78,15 @@ const Dashboard: React.FC = () => {
         const { count: reqCount, error: reqError } = await supabase.from('requerimento').select('*', { count: 'exact', head: true });
         if (reqError) throw reqError;
 
+        // Mensagens Hoje Count
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const { count: msgsToday, error: msgsError } = await supabase
+          .from('atendimento')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', startOfToday.toISOString());
+        if (msgsError) throw msgsError;
+
         // Agenda Items for the month view
         const firstDayOfMonth = new Date(calYear, calMonth, 1).toISOString();
         const lastDayOfMonth = new Date(calYear, calMonth + 1, 0, 23, 59, 59).toISOString();
@@ -89,7 +102,6 @@ const Dashboard: React.FC = () => {
         const rows = pessoaData || [];
         let total = 0;
         let monthCount = 0;
-        let weekCount = 0;
 
         // Inicia array com os meses do ano zerados
         const monthMap = new Array(12).fill(0);
@@ -115,7 +127,6 @@ const Dashboard: React.FC = () => {
           const d = new Date(p.created_at);
           
           if (isThisMonth(d)) monthCount++;
-          if (isThisWeek(d)) weekCount++;
           
           // Verifica se encaixa nos ultimos 7 dias usando string ISO local
           const pDateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -140,7 +151,7 @@ const Dashboard: React.FC = () => {
           count: d.count
         }));
 
-        setStats({ total, thisMonth: monthCount, thisWeek: weekCount, reqCount: reqCount || 0 });
+        setStats({ total, thisMonth: monthCount, messagesToday: msgsToday || 0, reqCount: reqCount || 0 });
         setChartData(aggregatedChart);
         setWeeklyData(aggregatedWeekly);
         setAgendaItems((agendaData ?? []) as AgendaItem[]);
@@ -153,8 +164,22 @@ const Dashboard: React.FC = () => {
     };
 
     fetchDashboardData();
-  }, [calYear, calMonth]);
 
+    // Inscreve no Realtime do Supabase para atualizar Dashboard em tempo real 
+    const subscription = supabase
+      .channel('dashboard_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda' }, () => {
+        fetchDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pessoa' }, () => {
+        fetchDashboardData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [calYear, calMonth]);
   // ─── Navigation ─────────────────────────────────────────────────────────────
   const navigateTo = (menuId: string, action?: string) => {
     if (action) {
@@ -213,12 +238,12 @@ const Dashboard: React.FC = () => {
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-200">
       {/* Greeting */}
       <div>
-         <h1 className="text-3xl font-heading font-semibold text-slate-900 dark:text-white">
-           {TEMPLATE_CONFIG.dashboard.greeting}, {firstName}
-         </h1>
-         <p className="mt-2 text-slate-500 dark:text-slate-400 font-sans">
-           {TEMPLATE_CONFIG.dashboard.subtitle}
-         </p>
+        <h1 className="text-3xl font-heading font-semibold text-slate-900 dark:text-white">
+          Olá, {firstName}
+        </h1>
+        <p className="mt-2 text-slate-500 dark:text-slate-400 font-sans">
+          Panorama da base de dados do gabinete.
+        </p>
       </div>
 
       {/* KPI Cards */}
@@ -266,16 +291,16 @@ const Dashboard: React.FC = () => {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-          className="bg-white dark:bg-[#1C2434] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-violet-300 dark:hover:border-violet-700 transition-colors"
+          className="bg-white dark:bg-[#1C2434] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-orange-300 dark:hover:border-orange-700 transition-colors"
         >
           <div className="absolute top-1/2 -translate-y-1/2 -right-4 opacity-5 dark:opacity-10 pointer-events-none group-hover:scale-110 transition-transform duration-300">
-            <TrendingUp size={80} />
+            <MessageSquare size={80} />
           </div>
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Pessoas nesta Sem.</p>
-          <h3 className="text-4xl font-heading font-bold text-slate-900 dark:text-white mb-2 relative z-10">{stats.thisWeek}</h3>
-          <div className="flex items-center text-[11px] xl:text-xs font-medium text-violet-600 dark:text-violet-400 relative z-10">
-            <TrendingUp className="h-3 w-3 mr-1.5" />
-            <span className="opacity-90">Cadastros nesta semana</span>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Mensagens Hoje</p>
+          <h3 className="text-4xl font-heading font-bold text-slate-900 dark:text-white mb-2 relative z-10">{stats.messagesToday}</h3>
+          <div className="flex items-center text-[11px] xl:text-xs font-medium text-orange-600 dark:text-orange-400 relative z-10">
+            <MessageSquare className="h-3 w-3 mr-1.5" />
+            <span className="opacity-90">Interações via IA (hoje)</span>
           </div>
         </motion.div>
       </div>
@@ -333,9 +358,11 @@ const Dashboard: React.FC = () => {
                     return (
                       <div
                         key={i}
-                        onClick={() => navigateTo('agenda')}
-                        className={`min-h-[80px] rounded-xl p-2 cursor-pointer border transition-all hover:shadow-md
-                          ${isTodayDay ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-900/10' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/50'}
+                        onClick={() => canAgenda && navigateTo('agenda')}
+                        className={`min-h-[80px] rounded-xl p-2 border transition-all
+                          ${canAgenda ? 'cursor-pointer hover:shadow-md' : 'cursor-default'}
+                          ${isTodayDay ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-900/10' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/50'}
+                          ${!isTodayDay && canAgenda ? 'hover:border-slate-300 dark:hover:border-slate-600' : ''}
                         `}
                       >
                         <span className={`text-xs font-bold block text-center mb-1.5 w-6 h-6 mx-auto rounded-full flex items-center justify-center
@@ -376,51 +403,60 @@ const Dashboard: React.FC = () => {
             
             <div className="space-y-3">
               <button 
-                onClick={() => navigateTo('pessoas', 'create')}
-                className="w-full flex items-center p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all text-left group"
+                onClick={() => canPessoas && navigateTo('pessoas', 'create')}
+                disabled={!canPessoas}
+                className={`w-full flex items-center p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 transition-all text-left group relative overflow-hidden
+                  ${canPessoas ? 'hover:border-blue-400 dark:hover:border-blue-600 hover:bg-slate-50 dark:hover:bg-slate-800/40' : 'opacity-50 cursor-not-allowed bg-slate-50/50 dark:bg-slate-800/20 grayscale-[50%]'}
+                `}
               >
-                <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 mr-3 group-hover:scale-105 transition-transform">
+                <div className={`h-10 w-10 flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 mr-3 ${canPessoas ? 'group-hover:scale-105 transition-transform' : ''}`}>
                   <Users className="h-5 w-5" />
                 </div>
                 <div className="flex-1">
-                  <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  <span className={`block text-sm font-semibold text-slate-800 dark:text-slate-200 transition-colors ${canPessoas ? 'group-hover:text-blue-600 dark:group-hover:text-blue-400' : ''}`}>
                     Nova Pessoa/Entidade
                   </span>
                   <span className="block text-xs text-slate-500">Abrir o formulário de cadastro</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight className={`h-4 w-4 text-slate-400 transition-all ${canPessoas ? 'group-hover:text-blue-500 group-hover:translate-x-0.5' : ''}`} />
               </button>
 
               <button 
-                onClick={() => navigateTo('requerimentos', 'create')}
-                className="w-full flex items-center p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 hover:border-purple-400 dark:hover:border-purple-600 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all text-left group overflow-hidden relative"
+                onClick={() => canReq && navigateTo('requerimentos', 'create')}
+                disabled={!canReq}
+                className={`w-full flex items-center p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 transition-all text-left group overflow-hidden relative
+                  ${canReq ? 'hover:border-purple-400 dark:hover:border-purple-600 hover:bg-slate-50 dark:hover:bg-slate-800/40' : 'opacity-50 cursor-not-allowed bg-slate-50/50 dark:bg-slate-800/20 grayscale-[50%]'}
+                `}
               >
-                <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 mr-3 group-hover:scale-105 transition-transform">
+                <div className={`h-10 w-10 flex items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 mr-3 ${canReq ? 'group-hover:scale-105 transition-transform' : ''}`}>
                   <FileText className="h-5 w-5" />
                 </div>
                 <div className="flex-1">
-                  <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                  <span className={`block text-sm font-semibold text-slate-800 dark:text-slate-200 transition-colors ${canReq ? 'group-hover:text-purple-600 dark:group-hover:text-purple-400' : ''}`}>
                     Novo Requerimento
                   </span>
                   <span className="block text-xs text-slate-500">Adicionar à lista</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-purple-500 group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight className={`h-4 w-4 text-slate-400 transition-all ${canReq ? 'group-hover:text-purple-500 group-hover:translate-x-0.5' : ''}`} />
               </button>
 
               <button 
-                onClick={() => navigateTo('agenda', 'create')}
-                className="w-full flex items-center p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 hover:border-violet-400 dark:hover:border-violet-600 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all text-left group overflow-hidden relative"
+                onClick={() => canAgenda && navigateTo('agenda', 'create')}
+                disabled={!canAgenda}
+                className={`w-full flex items-center p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 transition-all text-left group overflow-hidden relative
+                  ${canAgenda ? 'hover:border-violet-400 dark:hover:border-violet-600 hover:bg-slate-50 dark:hover:bg-slate-800/40' : 'opacity-50 cursor-not-allowed bg-slate-50/50 dark:bg-slate-800/20 grayscale-[50%]'}
+                `}
               >
-                <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 mr-3 group-hover:scale-105 transition-transform">
+                <div className={`h-10 w-10 flex items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 mr-3 ${canAgenda ? 'group-hover:scale-105 transition-transform' : ''}`}>
                   <CalendarDays className="h-5 w-5" />
                 </div>
                 <div className="flex-1">
-                  <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+                  <span className={`block text-sm font-semibold text-slate-800 dark:text-slate-200 transition-colors ${canAgenda ? 'group-hover:text-violet-600 dark:group-hover:text-violet-400' : ''}`}>
                     Nova Agenda
                   </span>
                   <span className="block text-xs text-slate-500">Marcar compromisso</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-violet-500 group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight className={`h-4 w-4 text-slate-400 transition-all ${canAgenda ? 'group-hover:text-violet-500 group-hover:translate-x-0.5' : ''}`} />
               </button>
             </div>
           </div>
