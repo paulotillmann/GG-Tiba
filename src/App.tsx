@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { AuthProvider, useAuth } from './src/contexts/AuthContext';
-import SplashScreen from './src/components/SplashScreen';
-import LoginScreen from './src/pages/LoginScreen';
-import RegisterScreen from './src/pages/RegisterScreen';
-import DashboardLayout from './src/layouts/DashboardLayout';
-import Dashboard from './src/pages/Dashboard';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import SplashScreen from './components/SplashScreen';
+import LoginScreen from './pages/LoginScreen';
+import RegisterScreen from './pages/RegisterScreen';
+import DashboardLayout from './layouts/DashboardLayout';
+import Dashboard from './pages/Dashboard';
 
 type AuthView = 'login' | 'register';
 

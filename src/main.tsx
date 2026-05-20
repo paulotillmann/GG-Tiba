@@ -1,7 +1,11 @@
+if (import.meta.env.DEV) {
+  import("react-grab");
+}
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { TEMPLATE_CONFIG } from './src/config/template.config';
+import { TEMPLATE_CONFIG } from './config/template.config';
 
 // Injeta configurações de SEO dinamicamente
 document.title = TEMPLATE_CONFIG.pageTitle;

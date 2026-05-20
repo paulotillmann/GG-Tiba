@@ -302,5 +302,7 @@ CREATE POLICY "Agenda escrita" ON public.agenda FOR ALL TO authenticated USING (
 
 -- Obs: As policies das tabelas de negócio podem variar, sugerimos políticas iniciais de permissão total para authenticated, e refinar via UI do Supabase de acordo com o gabinete.
 CREATE POLICY "Permissao Total Autenticado" ON public.requerimento FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permissao Total Autenticado" ON public.requerimento_arquivos FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Permissao Total Autenticado" ON public.atendimento FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Permissao Total Autenticado" ON public.anotacoes FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
