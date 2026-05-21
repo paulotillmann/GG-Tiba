@@ -6,6 +6,8 @@ import RegisterScreen from './pages/RegisterScreen';
 import DashboardLayout from './layouts/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 
+import OficioPrintStandalone from './pages/OficioPrintStandalone';
+
 type AuthView = 'login' | 'register';
 
 // ─── Inner App ────────────────────────────────────────────────────────────────
@@ -13,6 +15,13 @@ const AppContent: React.FC = () => {
   const { session, loading, profileLoaded, signOut } = useAuth();
   const [authView, setAuthView] = useState<AuthView>('login');
   const [showSplash, setShowSplash] = useState(true);
+
+  // 0. Standalone Print view (no splash, no auth layout)
+  const urlParams = new URLSearchParams(window.location.search);
+  const printOficioId = urlParams.get('print_oficio');
+  if (printOficioId) {
+    return <OficioPrintStandalone id={printOficioId} />;
+  }
 
   // 1. Logo na inicialização mostramos a Splash Screen.
   // Ela tem um timer interno de 3 segundos antes de chamar onComplete.

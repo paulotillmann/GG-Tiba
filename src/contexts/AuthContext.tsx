@@ -85,10 +85,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (modulesError) throw modulesError;
 
-        const modules = (modulesData ?? [])
+        let modules = (modulesData ?? [])
           .map((row: any) => row.modules as Module)
           .filter((m: Module) => m && m.is_active)
           .sort((a: Module, b: Module) => a.sort_order - b.sort_order);
+
+        // Auto-seeding automático do módulo de Ofícios caso esteja faltando na base de dados
+        const hasOficiosSlug = modules.some(m => m.slug === 'oficios');
+        if (!hasOficiosSlug && fetchedProfile.roles?.slug === 'admin') {
+          try {
+            // Verificar se o módulo de ofícios já existe na tabela modules
+            const { data: oficiosMod } = await supabase
+              .from('modules')
+              .select('id')
+              .eq('slug', 'oficios')
+              .maybeSingle();
+
+            let targetModuleId = oficiosMod?.id;
+
+            if (!targetModuleId) {
+              // Inserir módulo de ofícios
+              const { data: newMod } = await supabase
+                .from('modules')
+                .insert({
+                  name: 'Ofícios',
+                  slug: 'oficios',
+                  icon: 'FileText',
+                  description: 'Gestão e emissão de ofícios do gabinete',
+                  sort_order: 7,
+                  is_active: true,
+                  is_system: false
+                })
+                .select()
+                .single();
+
+              if (newMod) {
+                targetModuleId = newMod.id;
+              }
+            }
+
+            if (targetModuleId) {
+              // Vincular aos perfis 'admin' e 'colaborador'
+              const { data: allRoles } = await supabase.from('roles').select('id, slug');
+              if (allRoles) {
+                const adminRole = allRoles.find(r => r.slug === 'admin');
+                const colabRole = allRoles.find(r => r.slug === 'colaborador');
+                
+                const inserts = [];
+                if (adminRole) inserts.push({ role_id: adminRole.id, module_id: targetModuleId });
+                if (colabRole) inserts.push({ role_id: colabRole.id, module_id: targetModuleId });
+                
+                if (inserts.length > 0) {
+                  await supabase.from('role_module_permissions').insert(inserts);
+                }
+              }
+
+              // Re-buscar módulos autorizados
+              const { data: reFetched } = await supabase
+                .from('role_module_permissions')
+                .select('modules(*)')
+                .eq('role_id', fetchedProfile.role_id);
+
+              if (reFetched) {
+                modules = reFetched
+                  .map((row: any) => row.modules as Module)
+                  .filter((m: Module) => m && m.is_active)
+                  .sort((a: Module, b: Module) => a.sort_order - b.sort_order);
+              }
+            }
+          } catch (seedErr) {
+            console.error('[AuthContext] Falha no auto-seeding do módulo de ofícios:', seedErr);
+          }
+        }
 
         setUserModules(modules);
       } else {
