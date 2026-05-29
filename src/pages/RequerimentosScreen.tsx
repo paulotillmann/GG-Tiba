@@ -574,13 +574,13 @@ const RequerimentosScreen: React.FC = () => {
             <CloudDownload className="h-4 w-4 sm:mr-2" /> 
             <span className="hidden sm:inline">Importar SAPL</span>
           </button>
-          <button
+          {/* <button
             onClick={openCreate}
             className="flex items-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
           >
             <Plus className="h-4 w-4 sm:mr-2" /> 
             <span className="hidden sm:inline">Novo Requerimento</span>
-          </button>
+          </button> */}
         </div>
       </div>
 
